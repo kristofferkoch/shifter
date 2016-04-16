@@ -9,31 +9,30 @@
 #include <hal.h>
 #include <state_machine.h>
 
-enum cmd {
-	CMD_EOF, CMD_ID, CMD_PWM, CMD_SYNC, CMD_ADC, CMD_SET_GPIO, CMD_GET_GPIO,
-};
-enum state {
-	IDLE,
-	PWM1, PWM_rx_msb0, PWM_rx_lsb0, PWM_rx_msb1, PWM_rx_lsb1, PWM_rx_msb2, PWM_rx_lsb2,
-	PWM2, FW6, FW5, FW4, FW3, FW2, FW1,
-	SYNC,
-	ID, ID_tx0, ID_tx1, ID_tx2, ID_tx3, ID_EOF,
-	ADC, ADC_tx_msb, ADC_tx_lsb, ADC_EOF,
-	SET_GPIO1, SET_GPIO_rx, SET_GPIO2,
-	GET_GPIO, GET_GPIO_tx, GET_GPIO_EOF,
-};
-
-static enum state state = IDLE;
-static enum state retstate;
-static uint16_t pwm0;
-static uint16_t pwm1;
-static uint16_t pwm2;
-static uint8_t gpio_set;
-static uint8_t gpio_get;
+STATIC_STATE enum state state = IDLE;
+STATIC_STATE enum state retstate;
+STATIC_STATE uint16_t pwm0;
+STATIC_STATE uint16_t pwm1;
+STATIC_STATE uint16_t pwm2;
+STATIC_STATE uint8_t gpio_set;
+STATIC_STATE uint8_t gpio_get;
 
 static void panic() {
 	hal_reset();
 	for(;;);
+}
+
+static void sync(void) {
+  /* Start ADC */
+  hal_start_adc();
+  /* Get gpios */
+  gpio_get = hal_get_gpio();
+  /* Set gpios */
+  hal_set_gpio(gpio_set);
+  /* Apply PWM */
+  hal_set_pwm0(pwm0);
+  hal_set_pwm1(pwm1);
+  hal_set_pwm2(pwm2);
 }
 
 void state_machine_handle_rx_byte(uint8_t rx) {
@@ -46,10 +45,7 @@ void state_machine_handle_rx_byte(uint8_t rx) {
 			break;
 		case CMD_SYNC:
 			state = SYNC;
-			/* Start ADC */
-			/* Get gpios */
-			/* Set gpios */
-			/* Apply PWM */
+			sync();
 			hal_uart_tx(CMD_SYNC);
 			break;
 		case CMD_ID:
@@ -229,6 +225,8 @@ void state_machine_handle_rx_byte(uint8_t rx) {
 		state = retstate;
 		hal_uart_tx(rx);
 		break;
+	default:
+	        panic();
 	}
 }
 
@@ -252,11 +250,11 @@ void state_machine_handle_tx_ready(void) {
 		break;
 	case ADC_tx_msb:
 		state = ADC_tx_lsb;
-		hal_uart_tx(ADC0H);
+		hal_uart_tx(hal_adc_msb());
 		break;
 	case ADC_tx_lsb:
 		state = ADC_EOF;
-		hal_uart_tx(ADC0L);
+		hal_uart_tx(hal_adc_lsb());
 		break;
 	case GET_GPIO_tx:
 		state = GET_GPIO_EOF;
@@ -268,5 +266,7 @@ void state_machine_handle_tx_ready(void) {
 		state = IDLE;
 		hal_uart_tx(CMD_EOF);
 		break;
+	default:
+	  break;
 	}
 }

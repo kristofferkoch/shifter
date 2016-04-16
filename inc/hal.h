@@ -9,6 +9,8 @@
 #include <stdint.h>
 #include <SI_EFM8BB1_Register_Enums.h>
 
+#define STATIC_STATE static
+
 const uint8_t xdata CHIPID0 _at_ 0xFC;
 const uint8_t xdata CHIPID1 _at_ 0xFD;
 const uint8_t xdata CHIPID2 _at_ 0xFE;
